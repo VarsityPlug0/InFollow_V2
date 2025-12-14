@@ -4,12 +4,28 @@ from instagrapi import Client
 from instagrapi.exceptions import LoginRequired, ChallengeRequired, BadPassword, UserNotFound, PrivateError
 from datetime import datetime
 from models import db, DonatedAccount, Target, ActionLog
+from config import Config
 
 class InstagramAutomation:
     def __init__(self, session_folder='sessions'):
         self.session_folder = session_folder
         if not os.path.exists(session_folder):
             os.makedirs(session_folder)
+        
+        # Get proxy configuration
+        self.proxy_url = Config.get_proxy_url()
+        if self.proxy_url:
+            print(f"[INSTAGRAPI] 🌐 Proxy configured: {self.proxy_url.split('@')[-1]}")
+        else:
+            print(f"[INSTAGRAPI] ⚠️ No proxy configured - using direct connection")
+    
+    def _create_client(self):
+        """Create Instagram client with proxy if configured"""
+        client = Client()
+        if self.proxy_url:
+            client.set_proxy(self.proxy_url)
+            print(f"[INSTAGRAPI] Using proxy for this request")
+        return client
     
     def get_profile_info(self, username):
         """Fetch Instagram profile info using system validation account"""
@@ -20,7 +36,7 @@ class InstagramAutomation:
         SYSTEM_USERNAME = 'virg.ildebie'
         SYSTEM_PASSWORD = 'ShadowTest31@'
         
-        client = Client()
+        client = self._create_client()  # Use proxy if configured
         session_file = os.path.join(self.session_folder, f"{SYSTEM_USERNAME}.json")
         
         try:
@@ -60,7 +76,7 @@ class InstagramAutomation:
     def verify_account(self, username, password):
         """Verify donated account can login"""
         print(f"\n[INSTAGRAPI] Verifying account: @{username}")
-        client = Client()
+        client = self._create_client()  # Use proxy if configured
         session_file = os.path.join(self.session_folder, f"{username}.json")
         
         try:
@@ -120,7 +136,7 @@ class InstagramAutomation:
         # Check if target exists
         target_user_id = None
         try:
-            temp_client = Client()
+            temp_client = self._create_client()  # Use proxy if configured
             if accounts:
                 session_file = os.path.join(self.session_folder, f"{accounts[0].username}.json")
                 if os.path.exists(session_file):
@@ -150,7 +166,7 @@ class InstagramAutomation:
                     'status': f'Workforce member @{account.username} following @{target_username}...'
                 })
             
-            client = Client()
+            client = self._create_client()  # Use proxy if configured
             session_file = os.path.join(self.session_folder, f"{account.username}.json")
             
             try:
