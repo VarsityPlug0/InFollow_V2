@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram Barter System{% if demo_mode %} - Preview Mode{% endif %}</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    
+    <style>
+        :root {
+            --primary-color: #6366f1;
+            --primary-hover: #4f46e5;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --text-muted: #6b7280;
+            --border-color: #e5e7eb;
+            --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            padding: 2rem 0;
+        }
+        
+        .main-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+        
+        /* Demo Mode Banner */
+        .demo-banner { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
+        .demo-banner h2 { font-size: 24px; margin-bottom: 10px; }
+        .demo-banner p { margin-bottom: 15px; opacity: 0.9; }
+        .demo-banner button { background: white; color: #667eea; border: none; padding: 12px 30px; border-radius: 6px; font-size: 16px; font-weight: 600; cursor: pointer; }
+        .demo-banner button:hover { transform: scale(1.05); }
+        .demo-badge { display: inline-block; background: #ffc107; color: #000; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; margin-left: 10px; }
+        
+        /* Auth Banner */
+        .auth-banner { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
+        
+        h1 { text-align: center; margin-bottom: 10px; font-size: 32px; }
+        .subtitle { text-align: center; color: #8e8e8e; margin-bottom: 30px; }
+        .stats { background: white; border: 1px solid #dbdbdb; border-radius: 8px; padding: 20px; margin-bottom: 30px; text-align: center; }
+        .stats div { display: inline-block; margin: 0 20px; }
+        .stats .label { color: #8e8e8e; font-size: 14px; }
+        .stats .value { font-size: 24px; font-weight: 600; color: #0095f6; }
+        .lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+        .lane { background: white; border: 1px solid #dbdbdb; border-radius: 8px; padding: 30px; position: relative; }
+        .lane h2 { margin-bottom: 15px; font-size: 22px; }
+        .lane .description { color: #8e8e8e; margin-bottom: 20px; font-size: 14px; line-height: 1.5; }
+        .lane .highlight { background: #fff3cd; padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 13px; border-left: 3px solid #ffc107; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 500; font-size: 14px; }
+        input[type="text"], input[type="password"], input[type="email"] { width: 100%; padding: 10px; border: 1px solid #dbdbdb; border-radius: 4px; font-size: 14px; }
+        input:focus { outline: none; border-color: #0095f6; }
+        button { width: 100%; padding: 12px; background: #0095f6; color: white; border: none; border-radius: 4px; font-size: 14px; font-weight: 600; cursor: pointer; }
+        button:hover { background: #1877f2; }
+        button:disabled { background: #b2dffc; cursor: not-allowed; }
+        .status { margin-top: 15px; padding: 12px; border-radius: 4px; display: none; font-size: 14px; }
+        .status.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; display: block; }
+        .status.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; display: block; }
+        .status.info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; display: block; }
+        .status.warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; display: block; }
+        .progress { margin-top: 15px; display: none; }
+        .progress-bar { width: 100%; height: 30px; background: #e9ecef; border-radius: 4px; overflow: hidden; margin-bottom: 10px; }
+        .progress-fill { height: 100%; background: #0095f6; transition: width 0.3s; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: 600; }
+        .progress-text { text-align: center; font-size: 13px; color: #8e8e8e; }
+        .results { margin-top: 15px; background: #f8f9fa; padding: 15px; border-radius: 4px; display: none; }
+        .results h3 { font-size: 16px; margin-bottom: 10px; }
+        .results .stat-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 13px; }
+        .results .stat-row .label { color: #8e8e8e; }
+        .results .stat-row .value { font-weight: 600; }
+        .donation-section { background: white; border: 1px solid #dbdbdb; border-radius: 8px; padding: 30px; margin-bottom: 30px; }
+        .donation-section h2 { margin-bottom: 15px; font-size: 22px; }
+        .donation-section .info { background: #e7f3ff; padding: 15px; border-radius: 4px; margin-bottom: 20px; font-size: 14px; border-left: 3px solid #0095f6; }
+        
+        /* Modal */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
+        .modal-content { background-color: #fefefe; margin: 10% auto; padding: 30px; border: 1px solid #888; border-radius: 8px; width: 90%; max-width: 500px; }
+        .modal-header { margin-bottom: 20px; }
+        .modal-header h2 { font-size: 24px; margin-bottom: 10px; }
+        .modal-header p { color: #8e8e8e; font-size: 14px; }
+        .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .close:hover { color: #000; }
+        
+        @media (max-width: 768px) {
+            .lanes { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        {% if demo_mode %}
+        <div class="demo-banner">
+            <h2>🎭 Demo Mode Preview</h2>
+            <p>You're exploring in demo mode. All actions are simulated. Sign up to use real Instagram features!</p>
+            <button onclick="showSignupModal()">Sign Up - Start Using Real Features</button>
+        </div>
+        {% else %}
+        <div class="auth-banner">
+            ✓ Logged in as {{ user_email }} - Real mode active
+        </div>
+        {% endif %}
+        
+        <h1>Instagram Barter System{% if demo_mode %}<span class="demo-badge">DEMO</span>{% endif %}</h1>
+        <p class="subtitle">Grow your Instagram following through account donation</p>
+        
+        <div class="stats">
+            <div>
+                <div class="label">Free Test Status</div>
+                <div class="value" id="freeTestStatus">{% if free_test_used %}USED{% else %}AVAILABLE{% endif %}</div>
+            </div>
+            <div>
+                <div class="label">Free Targets</div>
+                <div class="value" id="freeTargets">{{ free_targets if not demo_mode else 0 }}</div>
+            </div>
+            <div>
+                <div class="label">Available Accounts</div>
+                <div class="value" id="unusedAccounts">{{ unused_accounts if not demo_mode else 25 }}</div>
+            </div>
+        </div>
+
+        <div class="donation-section">
+            <h2>💝 Donate Instagram Account{% if demo_mode %}<span class="demo-badge">DEMO</span>{% endif %}</h2>
+            <div class="info">
+                <strong>Earn 1 free target per donated account!</strong><br>
+                Each donated account = 30 followers for one of your targets.
+                {% if demo_mode %}<br><br><em>Demo mode: This will simulate the donation process.</em>{% endif %}
+            </div>
+            <div class="form-group">
+                <label for="donateUsername">Instagram Username</label>
+                <input type="text" id="donateUsername" placeholder="{% if demo_mode %}demo_account (try me!){% else %}username{% endif %}">
+            </div>
+            <div class="form-group">
+                <label for="donatePassword">Instagram Password</label>
+                <input type="password" id="donatePassword" placeholder="{% if demo_mode %}demo123 (try me!){% else %}password{% endif %}">
+            </div>
+            <button id="donateBtn" onclick="donateAccount()">{% if demo_mode %}Try Demo Donation{% else %}Donate Account{% endif %}</button>
+            <div id="donateStatus" class="status"></div>
+        </div>
+
+        <div class="lanes">
+            <div class="lane">
+                <h2>🎁 Free Test Lane{% if demo_mode %}<span class="demo-badge">DEMO</span>{% endif %}</h2>
+                <div class="description">
+                    Try the system for free! Uses available donated accounts to follow your target. Available once per user.
+                </div>
+                <div class="highlight">
+                    ⚠️ <strong>One-time only:</strong> You can only use this once, and the target will be permanently locked.
+                    {% if demo_mode %}<br><br><em>Demo mode: Simulated progress will be shown.</em>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label for="freeTestTarget">Target Username</label>
+                    <input type="text" id="freeTestTarget" placeholder="{% if demo_mode %}instagram (try me!){% else %}username{% endif %}" {% if free_test_used and not demo_mode %}disabled{% endif %}>
+                </div>
+                <button id="freeTestBtn" onclick="executeFreeTest()" {% if free_test_used and not demo_mode %}disabled{% endif %}>
+                    {% if free_test_used and not demo_mode %}Free Test Used{% elif demo_mode %}Try Demo Free Test (20 Follows){% else %}Try Free ({{ unused_accounts }} Follows){% endif %}
+                </button>
+                <div id="freeTestStatus" class="status"></div>
+                <div id="freeTestProgress" class="progress">
+                    <div class="progress-bar">
+                        <div id="freeTestProgressFill" class="progress-fill" style="width: 0%">0/20</div>
+                    </div>
+                    <div id="freeTestProgressText" class="progress-text"></div>
+                </div>
+                <div id="freeTestResults" class="results"></div>
+            </div>
+
+            <div class="lane">
+                <h2>⭐ Donation Reward Lane{% if demo_mode %}<span class="demo-badge">DEMO</span>{% endif %}</h2>
+                <div class="description">
+                    Use your earned targets! Uses all available donated accounts to follow your target.
+                </div>
+                <div class="highlight">
+                    ⚠️ <strong>Targets burn after use:</strong> Each target can only be used once across all lanes.
+                    {% if demo_mode %}<br><br><em>Demo mode: Simulated progress will be shown.</em>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label for="donationTarget">Target Username</label>
+                    <input type="text" id="donationTarget" placeholder="{% if demo_mode %}cristiano (try me!){% else %}username{% endif %}" {% if free_targets < 1 and not demo_mode %}disabled{% endif %}>
+                </div>
+                <button id="donationBtn" onclick="executeDonationBoost()" {% if free_targets < 1 and not demo_mode %}disabled{% endif %}>
+                    {% if free_targets < 1 and not demo_mode %}Donate to Unlock{% elif demo_mode %}Try Demo Boost (30 Follows){% else %}Boost Target ({{ unused_accounts }} Follows){% endif %}
+                </button>
+                <div id="donationStatus" class="status"></div>
+                <div id="donationProgress" class="progress">
+                    <div class="progress-bar">
+                        <div id="donationProgressFill" class="progress-fill" style="width: 0%">0/30</div>
+                    </div>
+                    <div id="donationProgressText" class="progress-text"></div>
+                </div>
+                <div id="donationResults" class="results"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Signup Modal -->
+    <div id="signupModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeSignupModal()">&times;</span>
+            <div class="modal-header">
+                <h2>Sign Up to Continue</h2>
+                <p>Create your account to use real Instagram features</p>
+            </div>
+            <div class="form-group">
+                <label for="signupEmail">Email Address</label>
+                <input type="email" id="signupEmail" placeholder="your@email.com">
+            </div>
+            <button onclick="completeSignup()">Create Account & Continue</button>
+            <div id="signupStatus" class="status"></div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let currentTier = null;
+        const isDemoMode = {{ 'true' if demo_mode else 'false' }};
+
+        function showSignupModal() {
+            document.getElementById('signupModal').style.display = 'block';
+        }
+
+        function closeSignupModal() {
+            document.getElementById('signupModal').style.display = 'none';
+        }
+
+        async function completeSignup() {
+            const email = document.getElementById('signupEmail').value.trim();
+            
+            if (!email) {
+                showStatus('signupStatus', 'Please enter your email', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/signup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showStatus('signupStatus', data.message, 'success');
+                    setTimeout(() => {
+                        window.location.reload();  // Reload to exit demo mode
+                    }, 1500);
+                } else {
+                    showStatus('signupStatus', data.error, 'error');
+                }
+            } catch (error) {
+                showStatus('signupStatus', 'Network error: ' + error.message, 'error');
+            }
+        }
+
+        function showStatus(elementId, message, type) {
+            const el = document.getElementById(elementId);
+            el.textContent = message;
+            el.className = `status ${type}`;
+        }
+
+        function hideStatus(elementId) {
+            document.getElementById(elementId).className = 'status';
+        }
+
+        function showProgress(tier) {
+            document.getElementById(`${tier}Progress`).style.display = 'block';
+        }
+
+        function hideProgress(tier) {
+            document.getElementById(`${tier}Progress`).style.display = 'none';
+        }
+
+        function updateProgress(tier, current, total) {
+            const percent = Math.round((current / total) * 100);
+            const fill = document.getElementById(`${tier}ProgressFill`);
+            fill.style.width = percent + '%';
+            fill.textContent = `${current}/${total}`;
+        }
+
+        // Demo Mode Simulation Functions
+        function simulateDemoProgress(tier, total) {
+            let current = 0;
+            showProgress(tier);
+            
+            const interval = setInterval(() => {
+                current++;
+                updateProgress(tier, current, total);
+                document.getElementById(`${tier}ProgressText`).textContent = `Demo: Processing ${current}/${total}...`;
+                
+                if (current >= total) {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        hideProgress(tier);
+                        const resultsHtml = `
+                            <h3>✅ Demo Complete!</h3>
+                            <div class="stat-row"><span class="label">Total:</span><span class="value">${total}</span></div>
+                            <div class="stat-row"><span class="label">Successful:</span><span class="value" style="color: #28a745;">${total - 2}</span></div>
+                            <div class="stat-row"><span class="label">Already Following:</span><span class="value" style="color: #ffc107;">2</span></div>
+                            <div class="stat-row"><span class="label">Failed:</span><span class="value" style="color: #dc3545;">0</span></div>
+                        `;
+                        document.getElementById(`${tier}Results`).innerHTML = resultsHtml;
+                        document.getElementById(`${tier}Results`).style.display = 'block';
+                        showStatus(`${tier}Status`, 'Demo complete! Sign up to use real features.', 'warning');
+                    }, 500);
+                }
+            }, 200);
+        }
+
+        async function donateAccount() {
+            const username = document.getElementById('donateUsername').value.trim();
+            const password = document.getElementById('donatePassword').value.trim();
+            
+            if (!username || !password) {
+                showStatus('donateStatus', 'Please enter username and password', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('donateBtn');
+            btn.disabled = true;
+            btn.textContent = isDemoMode ? 'Demo: Verifying...' : 'Verifying...';
+            hideStatus('donateStatus');
+
+            if (isDemoMode) {
+                // Demo mode simulation
+                setTimeout(() => {
+                    showStatus('donateStatus', 'Demo: Account verified! Sign up to donate real accounts.', 'warning');
+                    btn.disabled = false;
+                    btn.textContent = 'Try Demo Donation';
+                    document.getElementById('freeTargets').textContent = '1';
+                }, 1500);
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/donate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (data.requires_auth) {
+                    showSignupModal();
+                    btn.disabled = false;
+                    btn.textContent = 'Donate Account';
+                    return;
+                }
+
+                if (data.success) {
+                    showStatus('donateStatus', data.message, 'success');
+                    document.getElementById('donateUsername').value = '';
+                    document.getElementById('donatePassword').value = '';
+                    document.getElementById('freeTargets').textContent = data.free_targets;
+                    
+                    const unusedAccounts = parseInt(document.getElementById('unusedAccounts').textContent) + 1;
+                    document.getElementById('unusedAccounts').textContent = unusedAccounts;
+                    document.getElementById('freeTestBtn').textContent = `Try Free (${unusedAccounts} Follows)`;
+                    
+                    if (data.free_targets > 0) {
+                        document.getElementById('donationTarget').disabled = false;
+                        document.getElementById('donationBtn').disabled = false;
+                        document.getElementById('donationBtn').textContent = `Boost Target (${unusedAccounts} Follows)`;
+                    }
+                } else {
+                    showStatus('donateStatus', data.error, 'error');
+                }
+            } catch (error) {
+                showStatus('donateStatus', 'Network error: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Donate Account';
+            }
+        }
+
+        async function executeFreeTest() {
+            const target = document.getElementById('freeTestTarget').value.trim().replace('@', '');
+            
+            if (!target) {
+                showStatus('freeTestStatus', 'Please enter target username', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('freeTestBtn');
+            btn.disabled = true;
+            btn.textContent = isDemoMode ? 'Demo: Initializing...' : 'Initializing...';
+            hideStatus('freeTestStatus');
+            document.getElementById('freeTestResults').style.display = 'none';
+
+            if (isDemoMode) {
+                // Demo mode simulation
+                showStatus('freeTestStatus', 'Demo: Starting free test simulation...', 'info');
+                simulateDemoProgress('freeTest', 20);
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/free-test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ target })
+                });
+
+                const data = await response.json();
+
+                if (data.requires_auth) {
+                    showSignupModal();
+                    btn.disabled = false;
+                    btn.textContent = `Try Free (${document.getElementById('unusedAccounts').textContent} Follows)`;
+                    return;
+                }
+
+                if (data.success) {
+                    currentTier = 'freeTest';
+                    showStatus('freeTestStatus', data.message, 'info');
+                    showProgress('freeTest');
+                    updateProgress('freeTest', 0, 20);
+                    socket.emit('execute_follows', { target: data.target, tier: 'free_test' });
+                } else {
+                    showStatus('freeTestStatus', data.error, 'error');
+                    btn.disabled = false;
+                    const unusedAccounts = parseInt(document.getElementById('unusedAccounts').textContent);
+                    btn.textContent = `Try Free (${unusedAccounts} Follows)`;
+                }
+            } catch (error) {
+                showStatus('freeTestStatus', 'Network error: ' + error.message, 'error');
+                btn.disabled = false;
+                const unusedAccounts = parseInt(document.getElementById('unusedAccounts').textContent);
+                btn.textContent = `Try Free (${unusedAccounts} Follows)`;
+            }
+        }
+
+        async function executeDonationBoost() {
+            const target = document.getElementById('donationTarget').value.trim().replace('@', '');
+            
+            if (!target) {
+                showStatus('donationStatus', 'Please enter target username', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('donationBtn');
+            btn.disabled = true;
+            btn.textContent = isDemoMode ? 'Demo: Initializing...' : 'Initializing...';
+            hideStatus('donationStatus');
+            document.getElementById('donationResults').style.display = 'none';
+
+            if (isDemoMode) {
+                // Demo mode simulation
+                showStatus('donationStatus', 'Demo: Starting donation boost simulation...', 'info');
+                simulateDemoProgress('donation', 30);
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/donation-boost', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ target })
+                });
+
+                const data = await response.json();
+
+                if (data.requires_auth) {
+                    showSignupModal();
+                    btn.disabled = false;
+                    btn.textContent = `Boost Target (${document.getElementById('unusedAccounts').textContent} Follows)`;
+                    return;
+                }
+
+                if (data.success) {
+                    currentTier = 'donation';
+                    showStatus('donationStatus', data.message, 'info');
+                    showProgress('donation');
+                    updateProgress('donation', 0, 30);
+                    document.getElementById('freeTargets').textContent = data.free_targets;
+                    socket.emit('execute_follows', { target: data.target, tier: 'donation' });
+                } else {
+                    showStatus('donationStatus', data.error, 'error');
+                    btn.disabled = false;
+                    const unusedAccounts = parseInt(document.getElementById('unusedAccounts').textContent);
+                    btn.textContent = `Boost Target (${unusedAccounts} Follows)`;
+                }
+            } catch (error) {
+                showStatus('donationStatus', 'Network error: ' + error.message, 'error');
+                btn.disabled = false;
+                const unusedAccounts = parseInt(document.getElementById('unusedAccounts').textContent);
+                btn.textContent = `Boost Target (${unusedAccounts} Follows)`;
+            }
+        }
+
+        socket.on('progress', (data) => {
+            if (currentTier === 'freeTest') {
+                updateProgress('freeTest', data.current, data.total);
+                document.getElementById('freeTestProgressText').textContent = data.status;
+            } else if (currentTier === 'donation') {
+                updateProgress('donation', data.current, data.total);
+                document.getElementById('donationProgressText').textContent = data.status;
+            }
+        });
+
+        socket.on('complete', (data) => {
+            const tier = currentTier === 'freeTest' ? 'freeTest' : 'donation';
+            
+            hideProgress(tier);
+            
+            if (data.success) {
+                const results = data.results;
+                const resultsHtml = `
+                    <h3>✅ Boost Complete!</h3>
+                    <div class="stat-row"><span class="label">Total:</span><span class="value">${results.total}</span></div>
+                    <div class="stat-row"><span class="label">Successful:</span><span class="value" style="color: #28a745;">${results.success}</span></div>
+                    <div class="stat-row"><span class="label">Already Following:</span><span class="value" style="color: #ffc107;">${results.already_followed}</span></div>
+                    <div class="stat-row"><span class="label">Failed:</span><span class="value" style="color: #dc3545;">${results.failed}</span></div>
+                `;
+                document.getElementById(`${tier}Results`).innerHTML = resultsHtml;
+                document.getElementById(`${tier}Results`).style.display = 'block';
+                
+                showStatus(`${tier}Status`, `Boost completed! ${results.success + results.already_followed} accounts now follow your target.`, 'success');
+                
+                if (tier === 'freeTest') {
+                    document.getElementById('freeTestBtn').textContent = 'Free Test Used';
+                    document.getElementById('freeTestTarget').disabled = true;
+                    document.getElementById('freeTestStatus').textContent = 'USED';
+                } else {
+                    const freeTargets = parseInt(document.getElementById('freeTargets').textContent);
+                    const unusedAccounts = parseInt(document.getElementById('unusedAccounts').textContent) - results.total;
+                    document.getElementById('unusedAccounts').textContent = unusedAccounts;
+                    
+                    if (freeTargets < 1) {
+                        document.getElementById('donationBtn').disabled = true;
+                        document.getElementById('donationBtn').textContent = 'Donate to Unlock';
+                        document.getElementById('donationTarget').disabled = true;
+                    } else {
+                        document.getElementById('donationBtn').disabled = false;
+                        document.getElementById('donationBtn').textContent = `Boost Target (${unusedAccounts} Follows)`;
+                    }
+                    document.getElementById('donationTarget').value = '';
+                }
+                
+                if (tier === 'freeTest') {
+                    const unusedAccounts = parseInt(document.getElementById('unusedAccounts').textContent);
+                    document.getElementById('unusedAccounts').textContent = unusedAccounts - results.total;
+                }
+            } else {
+                showStatus(`${tier}Status`, data.error, 'error');
+                
+                if (tier === 'freeTest') {
+                    document.getElementById('freeTestBtn').disabled = false;
+                    const unusedAccounts = parseInt(document.getElementById('unusedAccounts').textContent);
+                    document.getElementById('freeTestBtn').textContent = `Try Free (${unusedAccounts} Follows)`;
+                } else {
+                    document.getElementById('donationBtn').disabled = false;
+                    const unusedAccounts = parseInt(document.getElementById('unusedAccounts').textContent);
+                    document.getElementById('donationBtn').textContent = `Boost Target (${unusedAccounts} Follows)`;
+                }
+            }
+            
+            currentTier = null;
+        });
+
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            const modal = document.getElementById('signupModal');
+            if (event.target == modal) {
+                closeSignupModal();
+            }
+        }
+    </script>
+</body>
+</html>

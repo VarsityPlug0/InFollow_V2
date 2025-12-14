@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Donate Account - Get More Followers</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 1rem;
+        }
+        
+        .main-card {
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(10px);
+            border-radius: 1.5rem;
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.2);
+            max-width: 600px;
+            width: 100%;
+            padding: 3rem;
+        }
+        
+        .logo {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 0.5rem;
+        }
+        
+        .subtitle {
+            color: #6b7280;
+            font-size: 1.125rem;
+            margin-bottom: 2.5rem;
+        }
+        
+        .btn-primary-custom {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1.125rem;
+            font-weight: 600;
+            border-radius: 0.75rem;
+            transition: all 0.2s;
+            width: 100%;
+        }
+        
+        .btn-primary-custom:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.2);
+        }
+        
+        .btn-primary-custom:disabled {
+            background: #d1d5db;
+            cursor: not-allowed;
+        }
+        
+        .form-control-lg {
+            border-radius: 0.75rem;
+            padding: 1rem 1.25rem;
+            font-size: 1.125rem;
+        }
+        
+        .form-label {
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 0.75rem;
+        }
+        
+        .info-box {
+            background: #ede9fe;
+            border: 2px solid #a78bfa;
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            margin-bottom: 2rem;
+        }
+        
+        .info-box h6 {
+            color: #5b21b6;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+        }
+        
+        .info-box ul {
+            color: #6b7280;
+            font-size: 0.875rem;
+            margin-bottom: 0;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-card">
+        <div class="text-center">
+            <div class="logo"><i class="bi bi-gift"></i></div>
+            <h1>Donate an Account</h1>
+            <p class="subtitle">Get 30 followers for each account you donate</p>
+        </div>
+        
+        <div class="info-box">
+            <h6><i class="bi bi-info-circle me-2"></i>How it Works</h6>
+            <ul>
+                <li>Donate an Instagram account you're not using</li>
+                <li>We'll use it to deliver followers to others</li>
+                <li>You get <strong>30 followers</strong> to any account you choose</li>
+                <li>Your donated account will follow others safely</li>
+            </ul>
+        </div>
+        
+        <div class="mb-4">
+            <label for="donateUsername" class="form-label">
+                <i class="bi bi-person me-2"></i>Instagram Username
+            </label>
+            <input type="text" class="form-control form-control-lg" id="donateUsername" 
+                   placeholder="username" autofocus>
+        </div>
+        
+        <div class="mb-4">
+            <label for="donatePassword" class="form-label">
+                <i class="bi bi-lock me-2"></i>Instagram Password
+            </label>
+            <input type="password" class="form-control form-control-lg" id="donatePassword" 
+                   placeholder="password">
+        </div>
+        
+        <button class="btn btn-primary-custom" id="donateBtn" onclick="submitDonation()">
+            <i class="bi bi-check-circle me-2"></i> Donate Account
+        </button>
+        
+        <div id="donateStatus" class="mt-3"></div>
+        
+        <div class="text-center mt-3">
+            <a href="/" style="color: #6366f1; text-decoration: none;">
+                <i class="bi bi-arrow-left me-1"></i> Back to Home
+            </a>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        function showAlert(message, type) {
+            const alertHtml = `
+                <div class="alert alert-${type} mb-0">
+                    <i class="bi bi-${type === 'danger' ? 'exclamation-triangle' : type === 'success' ? 'check-circle' : 'info-circle'} me-2"></i>
+                    ${message}
+                </div>
+            `;
+            document.getElementById('donateStatus').innerHTML = alertHtml;
+        }
+
+        async function submitDonation() {
+            const username = document.getElementById('donateUsername').value.trim().replace('@', '');
+            const password = document.getElementById('donatePassword').value.trim();
+            
+            if (!username || !password) {
+                showAlert('Please enter both username and password', 'danger');
+                return;
+            }
+
+            const btn = document.getElementById('donateBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Verifying account...';
+            document.getElementById('donateStatus').innerHTML = '';
+
+            try {
+                const response = await fetch('/api/donate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    document.getElementById('donateUsername').value = '';
+                    document.getElementById('donatePassword').value = '';
+                    
+                    // Redirect to dashboard after 2 seconds
+                    setTimeout(() => {
+                        window.location.href = '/dashboard';
+                    }, 2000);
+                } else {
+                    showAlert(data.error, 'danger');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-check-circle me-2"></i> Donate Account';
+                }
+            } catch (error) {
+                showAlert('Network error. Please try again.', 'danger');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check-circle me-2"></i> Donate Account';
+            }
+        }
+
+        // Allow Enter key to submit
+        document.getElementById('donatePassword').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') submitDonation();
+        });
+    </script>
+</body>
+</html>
