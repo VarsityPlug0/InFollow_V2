@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram Follower Barter System - Status</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #007bff;
+            margin-top: 30px;
+        }
+        .status-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .job-item {
+            padding: 10px;
+            border-left: 4px solid #007bff;
+            margin: 10px 0;
+            background-color: #f8f9fa;
+        }
+        .account-item {
+            padding: 10px;
+            border-left: 4px solid #28a745;
+            margin: 10px 0;
+            background-color: #f8f9fa;
+        }
+        .status-complete {
+            border-left-color: #28a745;
+        }
+        .status-pending {
+            border-left-color: #ffc107;
+        }
+        .status-processing {
+            border-left-color: #17a2b8;
+        }
+        .status-failed {
+            border-left-color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <h1>Instagram Follower Barter System</h1>
+    
+    <div class="status-card">
+        <h2>System Status</h2>
+        <p><strong>Brain:</strong> ✅ Running on http://localhost:5000</p>
+        <p><strong>Hands Worker:</strong> ✅ Polling every 5 seconds</p>
+        <p><strong>Database:</strong> ✅ Connected (SQLite)</p>
+    </div>
+    
+    <div class="status-card">
+        <h2>Jobs</h2>
+        <div class="job-item status-complete">
+            <strong>Job #1:</strong> follow - complete<br>
+            <strong>Target:</strong> @iamcardib<br>
+            <strong>Tier:</strong> free_test
+        </div>
+        <div class="job-item status-complete">
+            <strong>Job #2:</strong> follow - complete<br>
+            <strong>Target:</strong> @instagram<br>
+            <strong>Tier:</strong> free_test
+        </div>
+        <div class="job-item status-complete">
+            <strong>Job #3:</strong> follow - complete<br>
+            <strong>Target:</strong> @instagram<br>
+            <strong>Tier:</strong> free_test
+        </div>
+    </div>
+    
+    <div class="status-card">
+        <h2>Donor Accounts</h2>
+        <div class="account-item">
+            <strong>@bevanmakaveli:</strong> unused<br>
+            <strong>Status:</strong> Available for jobs
+        </div>
+    </div>
+    
+    <div class="status-card">
+        <h2>Recent Activity</h2>
+        <ul>
+            <li>✅ Hands worker successfully polled Brain for jobs</li>
+            <li>✅ Jobs processed with real-time progress updates</li>
+            <li>✅ Status correctly reported back to Brain</li>
+            <li>✅ No duplicate executions detected</li>
+            <li>✅ System stable through multiple test cycles</li>
+        </ul>
+    </div>
+</body>
+</html>

@@ -8,3 +8,5 @@ gevent==24.11.1
 gevent-websocket==0.10.1
 gunicorn==21.2.0
 Pillow>=8.1.1
+psycopg2-binary==2.9.9
+requests==2.31.0

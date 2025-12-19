@@ -5,7 +5,7 @@ monkey.patch_all()
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 from flask_socketio import SocketIO, emit
 from config import Config
-from models import db, User, DonatedAccount, Target, ActionLog
+from models import db, User, DonatedAccount, Target, ActionLog, Job
 from instagram import InstagramAutomation
 import os
 import uuid
@@ -15,7 +15,7 @@ app = Flask(__name__)
 app.config.from_object(Config)
 
 db.init_app(app)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
 
 ig_automation = InstagramAutomation(session_folder=app.config['SESSION_FOLDER'])
 
@@ -361,11 +361,29 @@ def claim_free_followers():
     # Create target record
     target = Target(username=target_username, tier='free_test', user_id=user.id)
     db.session.add(target)
+    
+    # Get all unused accounts for the job
+    unused_accounts = DonatedAccount.query.filter_by(status='unused').all()
+    accounts_data = [
+        {'username': acc.username, 'password': acc.password, 'id': acc.id}
+        for acc in unused_accounts
+    ]
+    
+    # Create job for Hands worker
+    job = Job(
+        job_type='follow',
+        target_username=target_username,
+        tier='free_test',
+        user_id=user.id,
+        payload={'accounts': accounts_data}
+    )
+    db.session.add(job)
     db.session.commit()
     
     print(f"[CLAIM] User {user.email} claimed free followers for @{target_username}")
+    print(f"[CLAIM] Created job #{job.id} with {len(accounts_data)} accounts")
     
-    return jsonify({'success': True, 'message': 'Starting follower delivery...', 'target': target_username})
+    return jsonify({'success': True, 'message': 'Job queued. Waiting for worker...', 'target': target_username, 'job_id': job.id})
 
 @app.route('/api/donate', methods=['POST'])
 def donate_account():
@@ -390,34 +408,51 @@ def donate_account():
         print(f"[DONATE] ✗ Account already donated")
         return jsonify({'success': False, 'error': 'This account has already been donated'}), 400
     
-    # Verify account
-    print(f"[DONATE] Verifying account with Instagram...")
-    success, message = ig_automation.verify_account(username, password)
-    if not success:
-        print(f"[DONATE] ✗ Verification failed: {message}")
-        return jsonify({'success': False, 'error': message}), 400
-    
-    # Save account
-    print(f"[DONATE] ✓ Verification successful, saving to database...")
-    
     # Get current user
     user = get_or_create_user()
     
-    # Create account with user_id
-    account = DonatedAccount(username=username, password=password, user_id=user.id)
-    db.session.add(account)
+    # Check if running locally (ig_automation available) or production (job-based)
+    is_local = os.environ.get('RENDER') != 'true'
     
-    # Increment user's free targets
-    user.free_targets += 1
-    
-    db.session.commit()
-    print(f"[DONATE] ✓ Account saved. User now has {user.free_targets} free target(s)")
-    
-    return jsonify({
-        'success': True,
-        'message': f'Account @{username} donated successfully! You now have {user.free_targets} free target(s).',
-        'free_targets': user.free_targets
-    })
+    if is_local:
+        # Local dev: verify directly
+        print(f"[DONATE] [LOCAL] Verifying account with Instagram...")
+        success, message = ig_automation.verify_account(username, password)
+        if not success:
+            print(f"[DONATE] ✗ Verification failed: {message}")
+            return jsonify({'success': False, 'error': message}), 400
+        
+        # Save account
+        print(f"[DONATE] ✓ Verification successful, saving to database...")
+        account = DonatedAccount(username=username, password=password, user_id=user.id)
+        db.session.add(account)
+        user.free_targets += 1
+        db.session.commit()
+        print(f"[DONATE] ✓ Account saved. User now has {user.free_targets} free target(s)")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Account @{username} donated successfully! You now have {user.free_targets} free target(s).',
+            'free_targets': user.free_targets
+        })
+    else:
+        # Production: create verification job
+        print(f"[DONATE] [PRODUCTION] Creating verification job")
+        job = Job(
+            job_type='verify',
+            user_id=user.id,
+            payload={'username': username, 'password': password}
+        )
+        db.session.add(job)
+        db.session.commit()
+        print(f"[DONATE] ✓ Created verification job #{job.id}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Verifying account @{username}... Please wait.',
+            'job_id': job.id,
+            'pending': True
+        })
 
 @app.route('/api/remove-account/<int:account_id>', methods=['DELETE'])
 def remove_account(account_id):
@@ -568,16 +603,147 @@ def use_credit():
     # Create target record
     target = Target(username=target_username, tier='donation', user_id=user.id)
     db.session.add(target)
+    
+    # Get all unused accounts for the job
+    unused_accounts = DonatedAccount.query.filter_by(status='unused').all()
+    accounts_data = [
+        {'username': acc.username, 'password': acc.password, 'id': acc.id}
+        for acc in unused_accounts
+    ]
+    
+    # Create job for Hands worker
+    job = Job(
+        job_type='follow',
+        target_username=target_username,
+        tier='donation',
+        user_id=user.id,
+        payload={'accounts': accounts_data}
+    )
+    db.session.add(job)
     db.session.commit()
     
     print(f"[CREDIT] User {user.email} used credit for @{target_username}. Remaining credits: {user.free_targets}")
+    print(f"[CREDIT] Created job #{job.id} with {len(accounts_data)} accounts")
     
     return jsonify({
         'success': True, 
-        'message': 'Starting follower delivery...', 
+        'message': 'Job queued. Waiting for worker...', 
         'target': target_username,
-        'credits_remaining': user.free_targets
+        'credits_remaining': user.free_targets,
+        'job_id': job.id
     })
+
+# ============================================================================
+# INTERNAL API (for Hands Worker)
+# ============================================================================
+
+def require_hands_api_key(f):
+    """Decorator to require Hands API key authentication"""
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        api_key = request.headers.get('X-Hands-API-Key')
+        if not api_key or api_key != app.config['HANDS_API_KEY']:
+            print(f"[INTERNAL] ✗ Unauthorized request - invalid API key")
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route('/internal/poll-jobs', methods=['GET'])
+@require_hands_api_key
+def poll_jobs():
+    """Poll for pending jobs (called by Hands worker)"""
+    # Get oldest pending job
+    job = Job.query.filter_by(status='pending').order_by(Job.created_at.asc()).first()
+    
+    if not job:
+        return '', 204  # No content
+    
+    # Mark job as processing
+    job.status = 'processing'
+    job.started_at = datetime.utcnow()
+    db.session.commit()
+    
+    print(f"[INTERNAL] ✓ Job #{job.id} ({job.job_type}) sent to Hands")
+    
+    # Return job data
+    return jsonify({
+        'job': {
+            'id': job.id,
+            'job_type': job.job_type,
+            'target_username': job.target_username,
+            'tier': job.tier,
+            'payload': job.payload
+        }
+    })
+
+@app.route('/internal/progress', methods=['POST'])
+@require_hands_api_key
+def job_progress():
+    """Receive progress updates from Hands worker"""
+    data = request.get_json()
+    job_id = data.get('job_id')
+    current = data.get('current')
+    total = data.get('total')
+    status_msg = data.get('status')
+    
+    job = Job.query.get(job_id)
+    if not job:
+        return jsonify({'success': False, 'error': 'Job not found'}), 404
+    
+    # Emit Socket.IO progress to user's browser
+    socketio.emit('progress', {
+        'current': current,
+        'total': total,
+        'status': status_msg
+    })
+    
+    print(f"[INTERNAL] Progress for job #{job_id}: {current}/{total} - {status_msg}")
+    
+    return jsonify({'success': True})
+
+@app.route('/internal/job-complete', methods=['POST'])
+@require_hands_api_key
+def job_complete():
+    """Mark job as complete (called by Hands worker)"""
+    data = request.get_json()
+    job_id = data.get('job_id')
+    status = data.get('status')  # 'complete' or 'failed'
+    result = data.get('result')
+    error = data.get('error')
+    
+    job = Job.query.get(job_id)
+    if not job:
+        return jsonify({'success': False, 'error': 'Job not found'}), 404
+    
+    # Update job status
+    job.status = status
+    job.completed_at = datetime.utcnow()
+    job.result = result
+    if error:
+        job.error = error
+    
+    db.session.commit()
+    
+    # Emit Socket.IO completion to user's browser
+    if status == 'complete':
+        socketio.emit('complete', {
+            'success': True,
+            'results': result
+        })
+        print(f"[INTERNAL] ✓ Job #{job_id} completed successfully")
+    else:
+        socketio.emit('complete', {
+            'success': False,
+            'error': error or 'Job failed'
+        })
+        print(f"[INTERNAL] ✗ Job #{job_id} failed: {error}")
+    
+    return jsonify({'success': True})
+
+# ============================================================================
+# SOCKET.IO (Real-time updates)
+# ============================================================================
 
 @socketio.on('execute_follows')
 def handle_execute_follows(data):
@@ -754,6 +920,11 @@ def demo_action():
         })
     
     return jsonify({'success': False, 'error': 'Unknown action type'}), 400
+
+@app.route('/system-status')
+def system_status():
+    """Serve system status page"""
+    return send_from_directory('.', 'system_status.html')
 
 if __name__ == '__main__':
     socketio.run(app, debug=True, host='0.0.0.0', port=5000)

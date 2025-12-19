@@ -62,3 +62,25 @@ class ActionLog(db.Model):
     
     def __repr__(self):
         return f'<ActionLog {self.donor_account} -> {self.target} [{self.result}]>'
+
+class Job(db.Model):
+    __tablename__ = 'jobs'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    job_type = db.Column(db.String(50), nullable=False)  # 'follow', 'verify', 'profile_lookup'
+    status = db.Column(db.String(20), default='pending', nullable=False)  # pending, processing, complete, failed
+    target_username = db.Column(db.String(100))
+    tier = db.Column(db.String(20))  # free_test, donation
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    payload = db.Column(db.JSON)  # Additional job data (accounts, passwords, etc.)
+    result = db.Column(db.JSON)  # Job results
+    retry_count = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    started_at = db.Column(db.DateTime)
+    completed_at = db.Column(db.DateTime)
+    error = db.Column(db.Text)
+    
+    user = db.relationship('User', backref=db.backref('jobs', lazy=True))
+    
+    def __repr__(self):
+        return f'<Job {self.id} - {self.job_type} [{self.status}]>'
